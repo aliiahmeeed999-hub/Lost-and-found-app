@@ -6,6 +6,7 @@ import { Mail, ArrowLeft } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
+
 export default function ForgotPasswordPage() {
   const router = useRouter();
   const [email, setEmail] = useState('');
