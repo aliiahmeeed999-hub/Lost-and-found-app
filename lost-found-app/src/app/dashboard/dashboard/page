@@ -1,1 +1,247 @@
+import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
+import { verifyToken, getUserFromCookies } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
+import Link from 'next/link';
+import { Package, Search, Clock, MapPin, User, Plus, Eye } from 'lucide-react';
+import LogoutButton from '@/components/LogoutButton';
+import NotificationDropdown from '@/components/NotificationDropdown';
+import MatchList from '@/components/MatchList';
+
+// Fetch dashboard data from database
+async function getDashboardData(userId) {
+  const [user, recentItems] = await Promise.all([
+    prisma.user.findUnique({ 
+      where: { id: userId },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        profileImage: true,
+        createdAt: true
+      }
+    }),
+    prisma.item.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      take: 5,
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        status: true,
+        itemStatus: true,
+        category: true,
+        imageUrls: true,
+        createdAt: true,
+        views: true
+      }
+    })
+  ]);
+
+  return { user, recentItems };
+}
+
+export default async function DashboardPage() {
+  // Get token from cookies (server-side)
+  const cookieStore = await cookies();
+  const tokenCookie = cookieStore.get('token');
+  const token = tokenCookie?.value;
+
+  if (!token) {
+    redirect('/login');
+  }
+
+  const decoded = verifyToken(token);
+  if (!decoded) {
+    redirect('/login');
+  }
+
+  // Fetch user and dashboard data
+  const { user, recentItems } = await getDashboardData(decoded.userId);
+
+  if (!user) {
+    redirect('/login');
+  }
+
+  // Render dashboard
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+      {/* Navigation Bar */}
+      <nav className="bg-white shadow-md border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="bg-gradient-to-r from-indigo-600 to-purple-600 p-2 rounded-xl shadow-lg">
+              <Package className="w-6 h-6 text-white" />
+            </div>
+            <h1 className="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+              Lost & Found
+            </h1>
+          </div>
+          <div className="flex items-center gap-3">
+            <Link 
+              href="/dashboard/profile" 
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              title="View Profile"
+            >
+              <User className="w-5 h-5 text-gray-700" />
+            </Link>
+            <NotificationDropdown />
+            <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-full flex items-center justify-center text-white font-semibold shadow-md">
+              {user.name.charAt(0).toUpperCase()}
+            </div>
+            <LogoutButton />
+          </div>
+        </div>
+      </nav>
+
+      {/* Main Content */}
+      <div className="max-w-6xl mx-auto px-4 py-12">
+        {/* Welcome Section */}
+        <div className="text-center mb-12">
+          <h2 className="text-4xl font-bold text-gray-800 mb-3">
+            Welcome back, {user.name}! 👋
+          </h2>
+          <p className="text-gray-600 text-lg">
+            Report and track your lost and found items
+          </p>
+        </div>
+
+        {/* Main Action Buttons - Report Lost & Found */}
+        <div className="grid md:grid-cols-2 gap-8 mb-12">
+          {/* Report Lost Item - Big Card */}
+          <Link 
+            href="/items/lost"
+            className="group relative overflow-hidden bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:scale-105"
+          >
+            <div className="absolute inset-0 bg-gradient-to-br from-red-50 to-red-100 opacity-0 group-hover:opacity-100 transition-opacity" />
+            <div className="relative p-8 text-center">
+              <div className="flex justify-center mb-6">
+                <div className="bg-gradient-to-br from-red-100 to-red-200 p-6 rounded-2xl shadow-md group-hover:shadow-lg transition-shadow">
+                  <Search className="w-12 h-12 text-red-600" />
+                </div>
+              </div>
+              <h3 className="text-2xl font-bold text-gray-800 mb-3">Report Lost Item</h3>
+              <p className="text-gray-600 mb-6">Tell us about an item you've lost and help reunite it with its owner</p>
+              <div className="inline-flex items-center gap-2 text-red-600 font-semibold group-hover:gap-3 transition-all">
+                <Plus className="w-5 h-5" />
+                Add New Item
+              </div>
+            </div>
+          </Link>
+
+          {/* Report Found Item - Big Card */}
+          <Link 
+            href="/items/found"
+            className="group relative overflow-hidden bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:scale-105"
+          >
+            <div className="absolute inset-0 bg-gradient-to-br from-green-50 to-green-100 opacity-0 group-hover:opacity-100 transition-opacity" />
+            <div className="relative p-8 text-center">
+              <div className="flex justify-center mb-6">
+                <div className="bg-gradient-to-br from-green-100 to-green-200 p-6 rounded-2xl shadow-md group-hover:shadow-lg transition-shadow">
+                  <Package className="w-12 h-12 text-green-600" />
+                </div>
+              </div>
+              <h3 className="text-2xl font-bold text-gray-800 mb-3">Report Found Item</h3>
+              <p className="text-gray-600 mb-6">Have you found an item? Let us know so we can help return it to its owner</p>
+              <div className="inline-flex items-center gap-2 text-green-600 font-semibold group-hover:gap-3 transition-all">
+                <Plus className="w-5 h-5" />
+                Add New Item
+              </div>
+            </div>
+          </Link>
+        </div>
+
+        {/* Browse All Items Section */}
+        <div className="mb-12">
+          <Link 
+            href="/items"
+            className="block w-full group relative overflow-hidden bg-gradient-to-r from-amber-400 via-amber-500 to-orange-500 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105"
+          >
+            <div className="absolute inset-0 bg-gradient-to-r from-orange-600 via-red-600 to-orange-600 opacity-0 group-hover:opacity-30 transition-opacity" />
+            <div className="relative p-8 text-center">
+              <div className="flex justify-center mb-4">
+                <MapPin className="w-8 h-8 text-white drop-shadow-lg" />
+              </div>
+              <h3 className="text-3xl font-bold text-white mb-2 drop-shadow-lg">Browse All Items</h3>
+              <p className="text-amber-50 text-lg drop-shadow-md">Search through all reported lost and found items in your area</p>
+            </div>
+          </Link>
+        </div>
+
+        {/* Potential Matches Section */}
+        <div className="mb-12">
+          <div className="flex items-center gap-3 mb-6">
+            <h2 className="text-2xl font-bold text-gray-800">Potential Matches</h2>
+            <span className="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-sm font-semibold">Auto-detected</span>
+          </div>
+          <MatchList userId={user.id} />
+        </div>
+
+        {/* Recent Items Section */}
+        {recentItems.length > 0 && (
+          <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-8">
+            <h2 className="text-2xl font-bold text-gray-800 mb-6">Your Recent Items</h2>
+            <div className="space-y-4">
+              {recentItems.map((item) => (
+                <Link 
+                  key={item.id}
+                  href={`/items/${item.id}`}
+                  className="group block border border-gray-200 rounded-xl p-4 hover:border-indigo-300 hover:shadow-md transition-all duration-300"
+                >
+                  <div className="flex items-start gap-4">
+                    {item.imageUrls.length > 0 ? (
+                      <img 
+                        src={item.imageUrls[0]} 
+                        alt={item.title}
+                        className="w-20 h-20 object-cover rounded-lg shadow-sm group-hover:shadow-md transition-shadow"
+                      />
+                    ) : (
+                      <div className="w-20 h-20 bg-gradient-to-br from-gray-100 to-gray-200 rounded-lg flex items-center justify-center shadow-sm">
+                        <Package className="w-8 h-8 text-gray-400" />
+                      </div>
+                    )}
+                    
+                    <div className="flex-1">
+                      <div className="flex items-start justify-between mb-2">
+                        <h3 className="font-semibold text-gray-800 text-lg group-hover:text-indigo-600 transition-colors">
+                          {item.title}
+                        </h3>
+                        <span className={`text-xs px-3 py-1 rounded-full font-medium whitespace-nowrap ${
+                          item.status === 'lost' 
+                            ? 'bg-red-100 text-red-700' 
+                            : 'bg-green-100 text-green-700'
+                        }`}>
+                          {item.status.toUpperCase()}
+                        </span>
+                      </div>
+                      
+                      <p className="text-sm text-gray-600 mb-3 line-clamp-2">
+                        {item.description}
+                      </p>
+                      
+                      <div className="flex items-center gap-4 text-xs text-gray-500 flex-wrap">
+                        <span className="flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          {new Date(item.createdAt).toLocaleDateString()}
+                        </span>
+                        <span className="bg-gray-100 px-2 py-1 rounded">
+                          {item.category}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Eye className="w-3 h-3" />
+                          {item.views} views
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
