@@ -1,1 +1,40 @@
+import { redirect } from 'next/navigation';
+import { cookies } from 'next/headers';
+import { verifyToken } from '@/lib/auth';
+
+/**
+ * Dashboard Layout - Protected Routes
+ * Ensures all /dashboard/* routes are protected server-side
+ * Verifies authentication before allowing access
+ */
+export default async function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  // Server-side authentication check
+  try {
+    const cookieStore = await cookies();
+    const token = cookieStore.get('token')?.value;
+
+    // If no token, redirect to login
+    if (!token) {
+      redirect('/login');
+    }
+
+    // Verify token validity
+    const decoded = verifyToken(token);
+
+    // If token is invalid, redirect to login
+    if (!decoded) {
+      redirect('/login');
+    }
+
+  } catch (error) {
+    console.error('Dashboard layout auth check error:', error);
+    redirect('/login');
+  }
+
+  return children;
+}
 
