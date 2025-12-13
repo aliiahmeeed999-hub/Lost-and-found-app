@@ -1,0 +1,138 @@
+// Prisma Schema for Lost & Found Application
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// USER MODEL
+// ============================================
+model User {
+  id            Int       @id @default(autoincrement())
+  name          String
+  email         String    @unique
+  passwordHash  String    @map("password_hash")
+  phone         String?
+  studentId     String?   @unique @map("student_id")
+  profileImage  String?   @map("profile_image")
+  bio           String?   @db.Text
+  isVerified    Boolean   @default(false) @map("is_verified")
+  reputation    Int       @default(0)
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  
+  // Relations
+  items         Item[]
+  notifications Notification[]
+  
+  @@map("users")
+  @@index([email])
+  @@index([reputation])
+}
+
+// ============================================
+// ITEM MODEL (Lost/Found Items)
+// ============================================
+model Item {
+  id              Int       @id @default(autoincrement())
+  userId          Int       @map("user_id")
+  title           String
+  description     String    @db.Text
+  category        String    // 'electronics', 'documents', 'keys', 'bags', 'clothing', 'accessories', 'books', 'other'
+  status          String    // 'lost' or 'found'
+  itemStatus      String    @default("active") @map("item_status") // 'active', 'reunited', 'closed'
+  
+  // Location fields
+  locationLost    String?   @map("location_lost")
+  locationFound   String?   @map("location_found")
+  locationDetails String?   @map("location_details") @db.Text
+  
+  // Date fields
+  dateLost        DateTime? @map("date_lost")
+  dateFound       DateTime? @map("date_found")
+  
+  // Media
+  imageUrls       String[]  @map("image_urls")
+  
+  // Contact & Reward
+  contactInfo     String?   @map("contact_info")
+  rewardAmount    Decimal?  @map("reward_amount") @db.Decimal(10, 2)
+  
+  // Metadata
+  tags            String[]
+  color           String?
+  brand           String?
+  distinguishingFeatures String? @map("distinguishing_features") @db.Text
+  
+  // Stats
+  views           Int       @default(0)
+  
+  // Timestamps
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  
+  // Relations
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  matches         Match[]   @relation("LostItems")
+  matchedBy       Match[]   @relation("FoundItems")
+  
+  @@map("items")
+  @@index([userId])
+  @@index([status])
+  @@index([category])
+  @@index([itemStatus])
+  @@index([createdAt])
+  @@index([dateLost])
+  @@index([dateFound])
+}
+
+// ============================================
+// MATCH MODEL (Potential Matches)
+// ============================================
+model Match {
+  id            Int       @id @default(autoincrement())
+  lostItemId    Int       @map("lost_item_id")
+  foundItemId   Int       @map("found_item_id")
+  matchScore    Float     @map("match_score") @default(0)
+  status        String    @default("pending") // 'pending', 'confirmed', 'rejected'
+  notes         String?   @db.Text
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  
+  // Relations
+  lostItem      Item      @relation("LostItems", fields: [lostItemId], references: [id], onDelete: Cascade)
+  foundItem     Item      @relation("FoundItems", fields: [foundItemId], references: [id], onDelete: Cascade)
+  
+  @@unique([lostItemId, foundItemId])
+  @@map("matches")
+  @@index([lostItemId])
+  @@index([foundItemId])
+  @@index([status])
+}
+
+// ============================================
+// NOTIFICATION MODEL
+// ============================================
+model Notification {
+  id        Int       @id @default(autoincrement())
+  userId    Int       @map("user_id")
+  type      String    // 'match', 'message', 'update', etc.
+  title     String
+  message   String    @db.Text
+  link      String?   // Link to relevant page (e.g., /matches/123)
+  isRead    Boolean   @default(false) @map("is_read")
+  createdAt DateTime  @default(now()) @map("created_at")
+  
+  // Relations
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("notifications")
+  @@index([userId])
+  @@index([isRead])
+  @@index([createdAt])
+}
